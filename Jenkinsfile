@@ -23,7 +23,19 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh 'docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .'
+                sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                sh """
+                  echo '🔍 Trivy scan: LOW & MEDIUM vulnerabilities (allowed)'
+                  trivy image --exit-code 0 --severity LOW,MEDIUM ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+                  echo '🚨 Trivy scan: HIGH & CRITICAL vulnerabilities (will fail build)'
+                  trivy image --exit-code 1 --severity HIGH,CRITICAL ${DOCKER_IMAGE}:${DOCKER_TAG}
+                """
             }
         }
 
@@ -36,10 +48,10 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    sh """
+                        echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
                         docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-                    '''
+                    """
                 }
             }
         }
@@ -47,10 +59,10 @@ pipeline {
 
     post {
         success {
-            echo 'CI Pipeline completed successfully!'
+            echo '✅ CI Pipeline completed successfully!'
         }
         failure {
-            echo 'CI Pipeline failed.'
+            echo '❌ CI Pipeline failed due to build or security issues.'
         }
     }
 }
